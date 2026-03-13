@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VoyageurVirtuel — Street View Tour</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=DM+Mono:wght@300;400&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #1a1a24;
+    --border: rgba(255,255,255,0.07);
+    --accent: #4f8ef7;
+    --accent2: #a78bfa;
+    --text: #f0f0f8;
+    --muted: #6b7099;
+    --success: #34d399;
+    --danger: #f87171;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Syne', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1.5rem;
+    height: 56px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    background: var(--surface);
+  }
+  .logo {
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .logo span { font-weight: 400; }
+  .header-status {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .live-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background 0.3s;
+  }
+  .live-dot.on { background: var(--success); box-shadow: 0 0 8px var(--success); animation: blink 1.4s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* ── Layout ── */
+  .main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 320px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .sidebar-section {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .section-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  input[type=text], input[type=password] {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 12px;
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  input:focus { border-color: var(--accent); }
+  input::placeholder { color: var(--muted); }
+
+  .input-row { display: flex; gap: 8px; }
+  .input-row input { flex: 1; }
+
+  .btn {
+    padding: 9px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .btn:hover { background: var(--surface2); border-color: rgba(255,255,255,0.15); }
+  .btn-accent {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .btn-accent:hover { background: #3a7de8; }
+  .btn-sm { padding: 6px 10px; font-size: 12px; }
+  .btn-danger { border-color: rgba(248,113,113,0.3); color: var(--danger); }
+  .btn-danger:hover { background: rgba(248,113,113,0.08); }
+
+  /* ── Place list ── */
+  .place-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.75rem 1.25rem;
+  }
+  .place-scroll::-webkit-scrollbar { width: 4px; }
+  .place-scroll::-webkit-scrollbar-track { background: transparent; }
+  .place-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .place-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: 8px;
+    margin-bottom: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+    border: 1px solid transparent;
+  }
+  .place-item:hover { background: var(--surface2); }
+  .place-item.active {
+    background: rgba(79,142,247,0.1);
+    border-color: rgba(79,142,247,0.3);
+  }
+  .place-item.visited .place-num { background: rgba(52,211,153,0.15); color: var(--success); }
+  .place-num {
+    width: 24px; height: 24px;
+    border-radius: 6px;
+    background: var(--surface2);
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.2s;
+  }
+  .place-item.active .place-num { background: var(--accent); color: #fff; }
+  .place-name { flex: 1; font-size: 13px; font-weight: 500; }
+  .place-city { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; }
+  .rm-btn {
+    width: 22px; height: 22px;
+    border: none; background: none;
+    color: var(--muted); cursor: pointer;
+    font-size: 16px; line-height: 1;
+    border-radius: 4px;
+    transition: all 0.15s;
+  }
+  .rm-btn:hover { color: var(--danger); background: rgba(248,113,113,0.1); }
+
+  .empty-state {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.8;
+  }
+
+  /* ── Controls ── */
+  .controls-bar {
+    padding: 1rem 1.25rem;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .speed-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .speed-row label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  input[type=range] {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 3px;
+    background: var(--surface2);
+    border-radius: 2px;
+    outline: none;
+    border: none;
+    padding: 0;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    background: var(--accent);
+    border-radius: 50%;
+    cursor: pointer;
+  }
+  .speed-val { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--accent); min-width: 28px; }
+
+  .nav-row { display: flex; gap: 6px; }
+  .nav-row .btn { flex: 1; text-align: center; justify-content: center; }
+
+  /* ── Progress ── */
+  .progress-track {
+    height: 2px;
+    background: var(--surface2);
+    border-radius: 1px;
+    margin-top: 4px;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 1px;
+    transition: width 0.5s ease;
+    width: 0%;
+  }
+
+  /* ── Map / Street View ── */
+  .map-area {
+    flex: 1;
+    position: relative;
+    background: #050508;
+  }
+
+  #street-view {
+    width: 100%; height: 100%;
+  }
+
+  .overlay-screen {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #050508;
+    z-index: 10;
+    gap: 1.5rem;
+    text-align: center;
+    padding: 2rem;
+  }
+  .overlay-icon {
+    font-size: 64px;
+    opacity: 0.15;
+  }
+  .overlay-title {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: var(--text);
+  }
+  .overlay-sub {
+    font-size: 14px;
+    color: var(--muted);
+    max-width: 360px;
+    line-height: 1.7;
+  }
+  .api-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    max-width: 400px;
+  }
+  .api-form input {
+    text-align: center;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    letter-spacing: 0.03em;
+  }
+  .api-hint {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+  }
+  .api-hint a { color: var(--accent); text-decoration: none; }
+  .api-hint a:hover { text-decoration: underline; }
+
+  /* ── Location HUD ── */
+  .hud {
+    position: absolute;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(10,10,15,0.85);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 20px;
+    display: none;
+    align-items: center;
+    gap: 12px;
+    z-index: 20;
+    min-width: 280px;
+    max-width: 90vw;
+  }
+  .hud.visible { display: flex; }
+  .hud-icon { font-size: 20px; }
+  .hud-name { font-size: 15px; font-weight: 700; letter-spacing: -0.02em; }
+  .hud-city { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; }
+  .hud-count {
+    margin-left: auto;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  /* ── Countdown ring ── */
+  .countdown-ring {
+    position: absolute;
+    top: 1rem; right: 1rem;
+    width: 52px; height: 52px;
+    z-index: 20;
+    display: none;
+  }
+  .countdown-ring.visible { display: block; }
+  .ring-bg { fill: none; stroke: rgba(255,255,255,0.08); stroke-width: 3; }
+  .ring-fill { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linecap: round;
+    transform-origin: 26px 26px; transform: rotate(-90deg);
+    transition: stroke-dashoffset 1s linear; }
+  .ring-text { fill: var(--text); font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 400; }
+
+  /* no-streetview fallback */
+  #fallback-map { width: 100%; height: 100%; display: none; }
+
+  .error-toast {
+    position: absolute;
+    top: 1rem; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(248,113,113,0.15);
+    border: 1px solid rgba(248,113,113,0.3);
+    color: var(--danger);
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    z-index: 30;
+    display: none;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Voyageur<span>Virtuel</span></div>
+  <div class="header-status">
+    <div class="live-dot" id="live-dot"></div>
+    <span id="header-status">En attente</span>
+  </div>
+</header>
+
+<div class="main">
+
+  <!-- ── Sidebar ── -->
+  <div class="sidebar">
+
+    <div class="sidebar-section">
+      <div class="section-label">Ville / Région</div>
+      <input type="text" id="city-input" placeholder="Ex: Paris, Tokyo, New York..." value="Paris, France" />
+    </div>
+
+    <div class="sidebar-section">
+      <div class="section-label">Ajouter un lieu</div>
+      <div class="input-row">
+        <input type="text" id="place-input" placeholder="Ex: Tour Eiffel..." />
+        <button class="btn btn-accent btn-sm" onclick="addPlace()">+</button>
+      </div>
+    </div>
+
+    <div class="place-scroll" id="place-list">
+      <div class="empty-state">Ajoutez des lieux<br>pour commencer votre voyage</div>
+    </div>
+
+    <div class="controls-bar">
+      <div class="speed-row">
+        <label>Durée / lieu</label>
+        <input type="range" id="duration" min="5" max="60" value="15" step="1" oninput="updateDuration()" />
+        <span class="speed-val" id="dur-val">15s</span>
+      </div>
+      <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+      <div class="nav-row">
+        <button class="btn btn-sm" id="prev-btn" onclick="manualNav(-1)" disabled>← Préc.</button>
+        <button class="btn btn-accent" id="start-btn" onclick="toggleTour()">▶ Démarrer</button>
+        <button class="btn btn-sm" id="next-btn" onclick="manualNav(1)" disabled>Suiv. →</button>
+      </div>
+      <button class="btn btn-danger btn-sm" id="reset-btn" onclick="resetTour()" style="display:none">↺ Recommencer</button>
+    </div>
+
+  </div>
+
+  <!-- ── Map area ── -->
+  <div class="map-area">
+
+    <!-- API key screen -->
+    <div class="overlay-screen" id="api-screen">
+      <div class="overlay-icon">🗺️</div>
+      <div class="overlay-title">Clé API Google Maps</div>
+      <div class="overlay-sub">Pour activer Street View automatique (bonhomme jaune inclus), entrez votre clé API Google Maps. Elle est gratuite jusqu'à 28 000 chargements/mois.</div>
+      <div class="api-form">
+        <input type="password" id="api-key-input" placeholder="AIzaSy..." autocomplete="off" />
+        <button class="btn btn-accent" onclick="loadMapsApi()">Activer Street View →</button>
+        <div class="api-hint">
+          Obtenir une clé gratuite :
+          <a href="https://console.cloud.google.com/google/maps-apis/credentials" target="_blank">console.cloud.google.com</a><br>
+          Activer : Maps JavaScript API + Street View API
+        </div>
+      </div>
+    </div>
+
+    <!-- Street View container -->
+    <div id="street-view"></div>
+
+    <!-- Fallback map (when no street view available) -->
+    <iframe id="fallback-map" frameborder="0" allowfullscreen></iframe>
+
+    <!-- Error toast -->
+    <div class="error-toast" id="error-toast"></div>
+
+    <!-- HUD location -->
+    <div class="hud" id="hud">
+      <div class="hud-icon">📍</div>
+      <div>
+        <div class="hud-name" id="hud-name">—</div>
+        <div class="hud-city" id="hud-city">—</div>
+      </div>
+      <div class="hud-count" id="hud-count">—</div>
+    </div>
+
+    <!-- Countdown ring -->
+    <svg class="countdown-ring" id="countdown-ring" viewBox="0 0 52 52">
+      <circle class="ring-bg" cx="26" cy="26" r="22"/>
+      <circle class="ring-fill" id="ring-fill" cx="26" cy="26" r="22"
+        stroke-dasharray="138.2" stroke-dashoffset="0"/>
+      <text class="ring-text" id="ring-text" x="26" y="31" text-anchor="middle">—</text>
+    </svg>
+
+  </div>
+</div>
+
+<script>
+// ── State ──
+let places = [
+  { name: "Tour Eiffel", city: "Paris" },
+  { name: "Musée du Louvre", city: "Paris" },
+  { name: "Notre-Dame de Paris", city: "Paris" },
+  { name: "Sacré-Cœur", city: "Paris" },
+  { name: "Arc de Triomphe", city: "Paris" },
+];
+let currentIdx = -1;
+let isRunning = false;
+let duration = 15;
+let tourInterval = null;
+let countdownInterval = null;
+let countdownVal = 0;
+let streetViewService = null;
+let panorama = null;
+let mapsLoaded = false;
+
+const CIRCUMFERENCE = 2 * Math.PI * 22; // r=22
+
+// ── Init ──
+renderList();
+
+function renderList() {
+  const el = document.getElementById('place-list');
+  if (places.length === 0) {
+    el.innerHTML = '<div class="empty-state">Ajoutez des lieux<br>pour commencer votre voyage</div>';
+    return;
+  }
+  el.innerHTML = places.map((p, i) => `
+    <div class="place-item ${i === currentIdx ? 'active' : ''} ${i < currentIdx ? 'visited' : ''}" onclick="jumpTo(${i})">
+      <div class="place-num">${i + 1}</div>
+      <div>
+        <div class="place-name">${p.name}</div>
+        <div class="place-city">${p.city || document.getElementById('city-input').value}</div>
+      </div>
+      <button class="rm-btn" onclick="event.stopPropagation();removePlace(${i})">×</button>
+    </div>
+  `).join('');
+}
+
+function addPlace() {
+  const inp = document.getElementById('place-input');
+  const val = inp.value.trim();
+  if (!val) return;
+  const city = document.getElementById('city-input').value.trim();
+  places.push({ name: val, city });
+  inp.value = '';
+  renderList();
+}
+
+document.getElementById('place-input').addEventListener('keydown', e => { if (e.key === 'Enter') addPlace(); });
+
+function removePlace(i) {
+  places.splice(i, 1);
+  if (currentIdx >= places.length) currentIdx = places.length - 1;
+  renderList();
+}
+
+function updateDuration() {
+  duration = parseInt(document.getElementById('duration').value);
+  document.getElementById('dur-val').textContent = duration + 's';
+}
+
+// ── Load Maps API ──
+function loadMapsApi() {
+  const key = document.getElementById('api-key-input').value.trim();
+  if (!key || key.length < 10) {
+    showError('Clé API invalide ou manquante.');
+    return;
+  }
+  const script = document.createElement('script');
+  script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=geometry&callback=initMaps`;
+  script.onerror = () => showError('Impossible de charger Google Maps. Vérifiez votre clé API.');
+  window.initMaps = initMaps;
+  document.head.appendChild(script);
+}
+
+function initMaps() {
+  mapsLoaded = true;
+  streetViewService = new google.maps.StreetViewService();
+  panorama = new google.maps.StreetViewPanorama(
+    document.getElementById('street-view'),
+    {
+      pov: { heading: 0, pitch: 0 },
+      zoom: 1,
+      addressControl: true,
+      fullscreenControl: true,
+      motionTracking: false,
+      linksControl: true,
+      panControl: true,
+      enableCloseButton: false,
+    }
+  );
+  document.getElementById('api-screen').style.display = 'none';
+  document.getElementById('live-dot').classList.add('on');
+  setStatus('Prêt — ' + places.length + ' lieux chargés');
+}
+
+// ── Tour control ──
+function toggleTour() {
+  if (places.length === 0) { showError('Ajoutez au moins un lieu !'); return; }
+  if (!mapsLoaded) { showError('Activez d\'abord votre clé API Google Maps.'); return; }
+  if (isRunning) {
+    pauseTour();
+  } else {
+    startTour();
+  }
+}
+
+function startTour() {
+  if (currentIdx < 0) currentIdx = 0;
+  isRunning = true;
+  document.getElementById('start-btn').textContent = '⏸ Pause';
+  document.getElementById('reset-btn').style.display = 'block';
+  document.getElementById('prev-btn').disabled = false;
+  document.getElementById('next-btn').disabled = false;
+  setStatus('Voyage en cours...');
+  document.getElementById('live-dot').classList.add('on');
+  visitCurrent();
+  scheduleNext();
+}
+
+function pauseTour() {
+  isRunning = false;
+  clearInterval(tourInterval);
+  clearInterval(countdownInterval);
+  document.getElementById('start-btn').textContent = '▶ Reprendre';
+  document.getElementById('countdown-ring').classList.remove('visible');
+  setStatus('En pause — ' + places[currentIdx]?.name);
+}
+
+function resetTour() {
+  pauseTour();
+  currentIdx = -1;
+  isRunning = false;
+  document.getElementById('start-btn').textContent = '▶ Démarrer';
+  document.getElementById('reset-btn').style.display = 'none';
+  document.getElementById('prev-btn').disabled = true;
+  document.getElementById('next-btn').disabled = true;
+  document.getElementById('hud').classList.remove('visible');
+  document.getElementById('countdown-ring').classList.remove('visible');
+  document.getElementById('progress-fill').style.width = '0%';
+  setStatus('Réinitialisé');
+  renderList();
+}
+
+function scheduleNext() {
+  clearInterval(tourInterval);
+  clearInterval(countdownInterval);
+  startCountdown();
+  tourInterval = setTimeout(() => {
+    if (!isRunning) return;
+    currentIdx++;
+    if (currentIdx >= places.length) {
+      endTour();
+      return;
+    }
+    visitCurrent();
+    scheduleNext();
+  }, duration * 1000);
+}
+
+function endTour() {
+  isRunning = false;
+  clearInterval(countdownInterval);
+  document.getElementById('countdown-ring').classList.remove('visible');
+  document.getElementById('start-btn').textContent = '▶ Démarrer';
+  setStatus('Voyage terminé ! ' + places.length + ' lieux visités.');
+  document.getElementById('live-dot').classList.remove('on');
+  renderList();
+}
+
+function startCountdown() {
+  clearInterval(countdownInterval);
+  countdownVal = duration;
+  updateRing(countdownVal);
+  document.getElementById('countdown-ring').classList.add('visible');
+  countdownInterval = setInterval(() => {
+    countdownVal--;
+    updateRing(countdownVal);
+    if (countdownVal <= 0) clearInterval(countdownInterval);
+  }, 1000);
+}
+
+function updateRing(val) {
+  const pct = val / duration;
+  const offset = CIRCUMFERENCE * (1 - pct);
+  document.getElementById('ring-fill').style.strokeDashoffset = offset;
+  document.getElementById('ring-text').textContent = val;
+}
+
+function jumpTo(idx) {
+  if (!mapsLoaded) return;
+  pauseTour();
+  currentIdx = idx;
+  visitCurrent();
+}
+
+function manualNav(dir) {
+  if (!mapsLoaded) return;
+  pauseTour();
+  const newIdx = currentIdx + dir;
+  if (newIdx < 0 || newIdx >= places.length) return;
+  currentIdx = newIdx;
+  visitCurrent();
+}
+
+// ── Street View lookup ──
+function visitCurrent() {
+  if (currentIdx < 0 || currentIdx >= places.length) return;
+  const p = places[currentIdx];
+  const city = p.city || document.getElementById('city-input').value.trim();
+  const fullQuery = `${p.name}, ${city}`;
+  renderList();
+  updateHUD(p, city);
+  updateProgress();
+  setStatus('Chargement : ' + p.name + '...');
+
+  // Geocode → Street View
+  const geocoder = new google.maps.Geocoder();
+  geocoder.geocode({ address: fullQuery }, (results, status) => {
+    if (status === 'OK' && results[0]) {
+      const loc = results[0].geometry.location;
+      findStreetView(loc, p.name);
+    } else {
+      showError('Lieu introuvable : ' + p.name);
+      setStatus('Lieu non trouvé : ' + p.name);
+    }
+  });
+}
+
+function findStreetView(latLng, name) {
+  streetViewService.getPanorama(
+    { location: latLng, radius: 500, preference: google.maps.StreetViewPreference.NEAREST },
+    (data, status) => {
+      if (status === 'OK') {
+        const panoLoc = data.location.latLng;
+        // Compute heading toward the place
+        const heading = google.maps.geometry
+          ? google.maps.geometry.spherical.computeHeading(panoLoc, latLng)
+          : 0;
+        panorama.setPosition(panoLoc);
+        panorama.setPov({ heading: heading, pitch: 5 });
+        panorama.setZoom(0);
+        panorama.setVisible(true);
+        document.getElementById('street-view').style.display = 'block';
+        document.getElementById('fallback-map').style.display = 'none';
+        setStatus('Street View : ' + name);
+      } else {
+        // Fallback to embedded map
+        showFallbackMap(latLng, name);
+      }
+    }
+  );
+}
+
+function showFallbackMap(latLng, name) {
+  const lat = typeof latLng.lat === 'function' ? latLng.lat() : latLng.lat;
+  const lng = typeof latLng.lng === 'function' ? latLng.lng() : latLng.lng;
+  document.getElementById('street-view').style.display = 'none';
+  const fb = document.getElementById('fallback-map');
+  fb.style.display = 'block';
+  const key = document.getElementById('api-key-input').value.trim();
+  fb.src = `https://www.google.com/maps/embed/v1/streetview?key=${key}&location=${lat},${lng}&fov=90&heading=0&pitch=0`;
+  setStatus('Vue carte (pas de Street View) : ' + name);
+}
+
+function updateHUD(p, city) {
+  document.getElementById('hud-name').textContent = p.name;
+  document.getElementById('hud-city').textContent = city;
+  document.getElementById('hud-count').textContent = (currentIdx + 1) + ' / ' + places.length;
+  document.getElementById('hud').classList.add('visible');
+}
+
+function updateProgress() {
+  const pct = ((currentIdx + 1) / places.length) * 100;
+  document.getElementById('progress-fill').style.width = pct + '%';
+}
+
+function setStatus(msg) {
+  document.getElementById('header-status').textContent = msg;
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-toast');
+  el.textContent = msg;
+  el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+</script>
+
+<!-- Load geometry library for heading computation (loaded after key entry) -->
+</body>
+</html>
